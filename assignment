@@ -7,11 +7,13 @@ class Sphere():
   def __init__(self,sphere,max_collision,container_radius):
     self.mass = float(sphere[0])
     self.radius = float(sphere[1])
-    self.velocity = np.array([float(i) for i in sphere[5:8]])
     self.name = sphere[8]
+    self.velocity = np.array([float(i) for i in sphere[5:8]])
     self.current = np.array([float(i) for i in sphere[2:5]])
-    self.count = float(max_collision)
+    self.count = int(max_collision)
     self.container = float(container_radius)
+
+
 
 
 
@@ -30,6 +32,13 @@ class Sphere():
   #     self.velocity= self.velocity - np.multiply(np.dot(np.subtract(self.velocity,other.velocity),np.subtract(self.current,other.current)),(2*other.mass)/(self.mass + other.mass)/np.dot(self.current-other.current,self.current-other.current),(self.current-other.current))\
   #     ,other.velocity - np.multiply(np.dot(np.subtract(other.velocity,self.velocity),np.subtract(other.current,self.current)),(2*self.mass)/(self.mass + other.mass)/np.dot(other.current-self.current,other.current-self.current)*(other.current-self.current))
 
+def mul2vector(a,b):
+  c = []
+  c.append(a[1]*b[2]-a[2]*b[1])
+  c.append(a[0]*b[2]-a[2]*b[0])
+  c.append(a[0]*b[1]-a[1]*b[0])
+  return (c)
+
 def changev(s1,s2):
   m = (2*s2.mass)/(s1.mass + s2.mass)
   v = np.subtract(s1.velocity,s2.velocity)
@@ -43,7 +52,7 @@ def changev(s1,s2):
 def wallchange(s1):
   distance = math.sqrt(s1.current[0]**2 + s1.current[1]**2 + s1.current[2]**2)
   unit = s1.current/distance
-  sproject = s1.velocity*unit*unit
+  sproject = np.array(np.multiply(np.dot(s1.velocity,unit),unit))
   soth = s1.velocity - sproject
   newvelocity = -sproject + soth
   return newvelocity
@@ -80,21 +89,22 @@ def predictwall(s1):
   d = b**2 -4*a*c
   if d >= 0:
     t1 = (-b+math.sqrt(b**2 -4*a*c))/(2*a)
-    return (t1)
+    t2 = (-b-math.sqrt(b**2 -4*a*c))/(2*a)
+    return max(t1,t2)
   else:
     return -1
 
 
 def main():
   #get input
-    container_radius = sys.argv[1]
-    max_collision = sys.argv[2]
+    container_radius = float(sys.argv[1])
+    max_collision = int(sys.argv[2])
     data = sys.stdin.readlines()
     sphere = [[] for _ in range(len(data))]
     m= 0 
     for line in data:
       line = line.strip('\n')
-      line = line.split(' ')
+      line = line.split()
       for i in line:
         sphere[m].append(i)
       m += 1
@@ -110,18 +120,31 @@ def main():
       momentum = np.add(momentum,np.multiply(i.velocity,i.mass))
     print('here are the initial sphere')
     for i in spherename:
-      print(i.name,'m = ',i.mass,'R = ',i.radius,'p = ',i.current,'v = ',i.velocity)
+      print(i.name,'m = ',i.mass,'R = ',i.radius,'p = ',i.current,'v = ',i.velocity,'bounce = ',max_collision-i.count)
     print('energy:',energy)
     print('momentum:',momentum)
+    print()
+    print('Here are the events.')
     timesum = 0 
     while len(spherename) > 0:
-      mintime = 9999999999999999999
+      for i in spherename:
+        stop = 0
+        if i.velocity[0] == 0 and i.velocity[1]==0 and i.velocity[2] == 0:
+          stop += 1
+      if stop == len(spherename):
+        print(spherename)
+        break
+      for i in spherename:
+        if i.count == -1:
+          spherename.remove(i)
+      mintime = 1.7976931348623157e+308
       for i in range(len(spherename)):
         time = predictwall(spherename[i])
         if time < mintime and time > 0:
           mintime = time
           wall = mintime
           sphere0 = i
+      mintime = 1.7976931348623157e+308
       for i in range(len(spherename)-1):
         for j in range(i+1,len(spherename)):
           time = predict(spherename[i],spherename[j])
@@ -137,27 +160,46 @@ def main():
         spherename[sphere2].count -= 1
         spherename[sphere1].velocity,spherename[sphere2].velocity= changev(spherename[sphere1],spherename[sphere2]),changev(spherename[sphere2],spherename[sphere1])
         timesum += mintime
-        if spherename[sphere2].count != 0 or spherename[sphere1].count != 0:
+        energy = 0
+        momentum = [0,0,0]
+        for i in spherename:
+          energy += 0.5*i.mass*(i.velocity[0]**2+i.velocity[1]**2+i.velocity[2]**2)
+          momentum = np.add(momentum,np.multiply(i.velocity,i.mass))
+        if spherename[sphere2].count > -1 or spherename[sphere1].count != -1:
           print('time of event:',timesum)
           print('colliding',spherename[sphere1].name,spherename[sphere2].name)
-          print(spherename[sphere1].name,'m = ',spherename[sphere1].mass,'R = ',spherename[sphere1].radius,'p = ',tuple(spherename[sphere1].current),'v = ',tuple(spherename[sphere1].velocity))
-          print(spherename[sphere2].name,'m = ',spherename[sphere2].mass,'R = ',spherename[sphere2].radius,'p = ',tuple(spherename[sphere2].current),'v = ',tuple(spherename[sphere2].velocity))
+          for i in spherename:
+            print(i.name,'m = ',i.mass,'R = ',i.radius,'p = ',i.current,'v = ',i.velocity,'bounce = ',max_collision-i.count)
           print('energy:',energy)
           print('momentum:',momentum)
+          print()
+        if spherename[sphere1].count == -1:
+          print('disappear',spherename[sphere1].name)
+          spherename.remove(spherename[sphere1])
+        if spherename[sphere2].count == -1:
+          print('disappear',spherename[sphere2].name)
+          spherename.remove(spherename[sphere2])
       else:
         for i in spherename:
           i.current = np.add(i.current, np.multiply(i.velocity,wall))
         spherename[sphere0].count -= 1
         spherename[sphere0].velocity = wallchange(spherename[sphere0])
         timesum +=wall
-        if spherename[sphere0].count != 0:
+        energy = 0
+        momentum = [0,0,0]
+        for i in spherename:
+          energy += 0.5*i.mass*(i.velocity[0]**2+i.velocity[1]**2+i.velocity[2]**2)
+          momentum = np.add(momentum,np.multiply(i.velocity,i.mass))
+        if spherename[sphere0].count > -1:
           print('time of event:',timesum)
           print('colliding',spherename[sphere0].name)
-          print(spherename[sphere0].name,'m = ',spherename[sphere0].mass,'R = ',spherename[sphere0].radius,'p = ',tuple(spherename[sphere0].current),'v = ',tuple(spherename[sphere0].velocity))
+          for i in spherename:
+            print(i.name,'m = ',i.mass,'R = ',i.radius,'p = ',i.current,'v = ',i.velocity,'bounce = ',max_collision-i.count)          
           print('energy:',energy)
           print('momentum:',momentum)
-      for i in spherename:
-        if i.count == 0:
-          spherename.remove(i)
+          print()
+        else:
+          print('disappear',spherename[sphere0].name)
+          spherename.remove(spherename[sphere0])
 if __name__ == '__main__':
   main()
